@@ -10,7 +10,8 @@ const createMeeting = async (req, res) => {
             return res.status(400).json({ error: "All fields are required" });
         }
         const meeting = await Meeting.create({ reason, startDate, endDate, room, candidates, user });
-        await meeting.populate("candidates").populate("room");
+        await meeting.populate("candidates");
+        await meeting.populate("room");
         const { subject, html } = buildMeetingEmail(meeting, req.email, { appUrl: process.env.DOMAIN, action: 'created' });
         sendToListOfUsers(meeting.candidates, subject, html);
         return res.status(201).json({ message: "Meeting created successfully", meeting });
