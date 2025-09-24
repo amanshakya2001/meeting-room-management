@@ -109,6 +109,12 @@
                 el.classList.toggle('is-invalid', !!isInvalid);
             }
 
+            function formatUTCForInput(d){
+                const date = (d instanceof Date) ? d : new Date(d);
+                if (isNaN(date)) return '';
+                return `${date.getUTCFullYear()}-${pad(date.getUTCMonth()+1)}-${pad(date.getUTCDate())}T${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
+            }
+
             function validateDateTimes(showAlert = false) {
                 if (!startInput || !endInput) return false;
                 const startVal = startInput.value;
@@ -151,11 +157,11 @@
             try {
                 if (MEETING.startDate) {
                     const s = new Date(MEETING.startDate);
-                    if (!isNaN(s)) startInput.value = formatLocalForInput(s);
+                    if (!isNaN(s)) startInput.value = formatUTCForInput(s);
                 }
                 if (MEETING.endDate) {
                     const e = new Date(MEETING.endDate);
-                    if (!isNaN(e)) endInput.value = formatLocalForInput(e);
+                    if (!isNaN(e)) endInput.value = formatUTCForInput(e);
                 }
             } catch(_) {}
 

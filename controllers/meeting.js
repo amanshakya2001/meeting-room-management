@@ -10,7 +10,7 @@ const createMeeting = async (req, res) => {
             return res.status(400).json({ error: "All fields are required" });
         }
         const meeting = await Meeting.create({ reason, startDate, endDate, room, candidates, user });
-        meeting.populate("candidates").populate("room");
+        await meeting.populate("candidates").populate("room");
         const { subject, html } = buildMeetingEmail(meeting, req.email, { appUrl: process.env.DOMAIN, action: 'created' });
         sendToListOfUsers(meeting.candidates, subject, html);
         return res.status(201).json({ message: "Meeting created successfully", meeting });
@@ -51,7 +51,7 @@ const updateMeeting = async (req, res) => {
 
 const deleteMeeting = async (req, res) => {
     try {
-        const meeting = await Meeting.findByIdAndDelete(req.params.id).populate("candidates").populate("room");;
+        const meeting = await Meeting.findByIdAndDelete(req.params.id).populate("candidates").populate("room");
         const { subject, html } = buildMeetingEmail(meeting, req.email, { appUrl: process.env.DOMAIN, action: 'cancelled' });
         sendToListOfUsers(meeting.candidates, subject, html);
         return res.status(200).json({ meeting });
