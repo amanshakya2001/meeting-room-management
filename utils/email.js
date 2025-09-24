@@ -13,7 +13,7 @@ const transporter = nodemailer.createTransport({
 const sendEmail = async (to, subject, text,html) => {
     try {
         const mailOptions = {
-            from: process.env.EMAIL_FROM,
+            from: `Meeting Room Management <${process.env.EMAIL_FROM}>`,
             to,
             subject,
             text,
