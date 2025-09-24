@@ -10,7 +10,7 @@ const homePage = async (req, res) => {
     if(req.role === "admin"){
         rooms = await Room.find({});
         users = await Users.find({});
-        meetings = await Meetings.find({}).populate("user").populate("room").populate("candidates").sort({ startDate: 1 });
+        meetings = await Meetings.find({}).populate("user").populate("room").populate("candidates").sort({ startDate: 1 }).lean().exec();
     }
     else{
         meetings = await Meetings.find({
