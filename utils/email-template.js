@@ -76,9 +76,9 @@ function buildMeetingEmail(meeting = {}, actionEmail = '', organizerEmail = '', 
 
     // If the email is targeted *to the removed candidates themselves*, change subject & intro
     if (notifyTarget === 'removed') {
-      subjectPrefix = `You were removed from meeting`;
-      headline = 'You were removed from this meeting';
-      introLine = `You have been removed from this meeting by ${actionEmail}.`;
+      subjectPrefix = `You were no longer invited to meeting`;
+      headline = 'You were no longer invited to this meeting';
+      introLine = `You have been no longer invited to this meeting by ${actionEmail}.`;
       // we might prefer a different accent for this personal notification
       accentColor = '#9b5cf6';
     }
