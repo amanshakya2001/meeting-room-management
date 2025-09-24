@@ -51,14 +51,14 @@ const homePage = async (req, res) => {
     }
     meetings = meetings.map((meeting) => {
         return {
-            ...meeting._doc,
+            ...meeting,
             startDate: meeting.startDate.toLocaleString(),
             endDate: meeting.endDate.toLocaleString()
         }
     });
     pastMeetings = pastMeetings.map((meeting) => {
         return {
-            ...meeting._doc,
+            ...meeting,
             startDate: meeting.startDate.toLocaleString(),
             endDate: meeting.endDate.toLocaleString()
         }
