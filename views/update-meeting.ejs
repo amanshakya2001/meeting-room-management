@@ -68,17 +68,20 @@
     </section>
     <script id="meeting-data" type="application/json"><%- JSON.stringify({
         meeting: (typeof meeting !== 'undefined' ? meeting : {}),
-        candidates: (typeof candidates !== 'undefined' ? candidates : [])
+        candidates: (typeof candidates !== 'undefined' ? candidates : []),
+        rooms: (typeof rooms !== 'undefined' ? rooms : [])
     }) %></script>
     <script>
         // Server data
         const __RAW = document.getElementById('meeting-data');
         let MEETING = {};
         let CANDIDATES = [];
+        let ROOMS = [];
         try {
             const parsed = JSON.parse(__RAW?.textContent || '{}');
             MEETING = parsed.meeting || {};
             CANDIDATES = parsed.candidates || [];
+            ROOMS = parsed.rooms || [];
         } catch (e) { console.warn('Failed parsing meeting-data', e); }
 
         // helpers: datetime formatting and validation
@@ -245,6 +248,12 @@
                 opt.textContent = MEETING.room.name || 'Current Room';
                 selectElement.appendChild(opt);
             }
+            ROOMS.forEach(room => {
+                const opt = document.createElement('option');
+                opt.value = room._id || room.id;
+                opt.textContent = room.name || 'Unknown Room';
+                selectElement.appendChild(opt);
+            });
             availableRoomsDiv.appendChild(labelElement);
             availableRoomsDiv.appendChild(selectElement);
 
