@@ -160,11 +160,11 @@
             try {
                 if (MEETING.startDate) {
                     const s = new Date(MEETING.startDate);
-                    if (!isNaN(s)) startInput.value = formatUTCForInput(s);
+                    if (!isNaN(s)) startInput.value = formatLocalForInput(s);
                 }
                 if (MEETING.endDate) {
                     const e = new Date(MEETING.endDate);
-                    if (!isNaN(e)) endInput.value = formatUTCForInput(e);
+                    if (!isNaN(e)) endInput.value = formatLocalForInput(e);
                 }
             } catch(_) {}
 
