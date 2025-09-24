@@ -6,24 +6,57 @@ const homePage = async (req, res) => {
     let rooms = [];
     let meetings = [];
     let users = [];
+    let pastMeetings = [];
     if(req.role === "admin"){
         rooms = await Room.find({});
         users = await Users.find({});
-        meetings = await Meetings.find({}).populate("user").populate("room").populate("candidates");
+        meetings = await Meetings.find({}).populate("user").populate("room").populate("candidates").sort({ startDate: 1 });
     }
     else{
         meetings = await Meetings.find({
-            $or: [
-              { user: req.id },
-              { candidates: { $in: [req.id] } }
+            $and: [
+              {
+                $or: [
+                  { user: req.id },
+                  { candidates: req.id }
+                ]
+              },
+              { startDate: { $gt: new Date() } } 
             ]
           })
-          .populate('user')
-          .populate('room')
-          .populate('candidates')
-          .exec();
+            .populate('user')
+            .populate('room')
+            .populate('candidates')
+            .sort({ startDate: 1 }) 
+            .lean()
+            .exec();
+
+        pastMeetings = await Meetings.find({
+            $and: [
+              {
+                $or: [
+                  { user: req.id },
+                  { candidates: req.id }
+                ]
+              },
+              { startDate: { $lt: new Date() } } 
+            ]
+          })
+            .populate('user')
+            .populate('room')
+            .populate('candidates')
+            .sort({ startDate: 1 }) 
+            .lean()
+            .exec();
     }
     meetings = meetings.map((meeting) => {
+        return {
+            ...meeting._doc,
+            startDate: meeting.startDate.toLocaleString(),
+            endDate: meeting.endDate.toLocaleString()
+        }
+    });
+    pastMeetings = pastMeetings.map((meeting) => {
         return {
             ...meeting._doc,
             startDate: meeting.startDate.toLocaleString(),
@@ -35,7 +68,8 @@ const homePage = async (req, res) => {
         role: req.role,
         rooms,
         meetings,
-        users
+        users,
+        pastMeetings
     });
 };
 
@@ -100,7 +134,11 @@ const updateMeetingPage = async (req, res) => {
     try {
         const meeting = await Meetings.findById(req.params.id).populate("user").populate("room").populate("candidates");
         const candidates = await Users.find({});
-        const rooms = await Room.find({});
+        const bookedRooms = await Meetings.find({
+            startDate: { $lt: meeting.endDate },   
+            endDate: { $gt: meeting.startDate }    
+          }).distinct("room");
+        const availableRooms = await Room.find({ _id: { $nin: bookedRooms } });
         if(!meeting){
             res.redirect("/");
         }
@@ -109,7 +147,7 @@ const updateMeetingPage = async (req, res) => {
             role: req.role,
             meeting,
             candidates,
-            rooms
+            rooms: availableRooms
         });
     } catch (error) {
         res.redirect("/");
