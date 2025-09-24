@@ -12,7 +12,7 @@ const createMeeting = async (req, res) => {
         const meeting = await Meeting.create({ reason, startDate, endDate, room, candidates, user });
         await meeting.populate("candidates");
         await meeting.populate("room");
-        const { subject, html } = buildMeetingEmail(meeting, meeting.user.email, { appUrl: process.env.DOMAIN, action: 'created' });
+        const { subject, html } = buildMeetingEmail(meeting, req.email, meeting.user.email, { appUrl: process.env.DOMAIN, action: 'created' });
         sendToListOfUsers(meeting.candidates, subject, html);
         return res.status(201).json({ message: "Meeting created successfully", meeting });
     } catch (error) {
@@ -41,24 +41,28 @@ const getMeeting = async (req, res) => {
 const updateMeeting = async (req, res) => {
     try {
         const { reason, startDate, endDate, room, candidates } = req.body;
-        const oldMeeting = await Meeting.findById(req.params.id);
-        const meeting = await Meeting.findByIdAndUpdate(req.params.id, { reason, startDate, endDate, room, candidates }).populate("candidates").populate("room");
-
-        const removedCandidates = oldMeeting.candidates.filter(candidate => !meeting.candidates.includes(candidate));
-        const addedCandidates = meeting.candidates.filter(candidate => !oldMeeting.candidates.includes(candidate));
+        const oldMeeting = await Meeting.findById(req.params.id).populate("candidates").populate("room");
+        const meeting = await Meeting.findByIdAndUpdate(req.params.id, { reason, startDate, endDate, room, candidates }, { new: true }).populate("user").populate("candidates").populate("room");
+        const removedCandidates = (oldMeeting.candidates || []).filter(oc =>
+            !(meeting.candidates || []).some(nc => nc._id?.equals?.(oc._id))
+        );
+          
+        const addedCandidates = (meeting.candidates || []).filter(nc =>
+            !(oldMeeting.candidates || []).some(oc => oc._id?.equals?.(nc._id))
+        );
 
         if (removedCandidates.length > 0) {
-            const { subject, html } = buildMeetingEmail(meeting, meeting.user.email, { appUrl: process.env.DOMAIN, action: 'candidates_removed', notify: 'removed', removedCandidates });
+            const { subject, html } = buildMeetingEmail(meeting, req.email, meeting.user.email, { appUrl: process.env.DOMAIN, action: 'candidates_removed', notify: 'removed', removedCandidates });
             sendToListOfUsers(removedCandidates, subject, html);
         }
 
         if (addedCandidates.length > 0) {
-            const { subject, html } = buildMeetingEmail(meeting, meeting.user.email, { appUrl: process.env.DOMAIN, action: 'created' });
+            const { subject, html } = buildMeetingEmail(meeting, req.email, meeting.user.email, { appUrl: process.env.DOMAIN, action: 'created' });
             sendToListOfUsers(addedCandidates, subject, html);
         }
 
         if (removedCandidates.length === 0 && addedCandidates.length === 0) {
-            const { subject, html } = buildMeetingEmail(meeting, meeting.user.email, { appUrl: process.env.DOMAIN, action: 'updated' });
+            const { subject, html } = buildMeetingEmail(meeting, req.email, meeting.user.email, { appUrl: process.env.DOMAIN, action: 'updated' });
             sendToListOfUsers(meeting.candidates, subject, html);
         }
         return res.status(200).json({ meeting });
@@ -70,7 +74,7 @@ const updateMeeting = async (req, res) => {
 const deleteMeeting = async (req, res) => {
     try {
         const meeting = await Meeting.findByIdAndDelete(req.params.id).populate("candidates").populate("room");
-        const { subject, html } = buildMeetingEmail(meeting, meeting.user.email, { appUrl: process.env.DOMAIN, action: 'cancelled' });
+        const { subject, html } = buildMeetingEmail(meeting, req.email, meeting.user.email, { appUrl: process.env.DOMAIN, action: 'cancelled' });
         sendToListOfUsers(meeting.candidates, subject, html);
         return res.status(200).json({ meeting });
     } catch (error) {

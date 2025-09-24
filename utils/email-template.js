@@ -1,5 +1,3 @@
-// helper-email.js
-
 function escapeHtml(str = '') {
   return String(str || '')
     .replace(/&/g, '&amp;')
@@ -23,20 +21,7 @@ function formatDateToUI(inputDate) {
   return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
 }
 
-/**
- * buildMeetingEmail(meeting, organizerEmail, opts)
- * - meeting: { reason, startDate, endDate, room:{name}, _id?, description, location, candidates }
- * - organizerEmail: string
- * - opts: {
- *     appUrl,
- *     action: 'created'|'updated'|'cancelled'|'candidates_removed',
- *     notify: 'removed'|'organizers'   // <-- new: who the email is targeted at
- *     removedCandidates: []           // list passed in when action === 'candidates_removed'
- *   }
- *
- * returns: { subject, html, text, action }
- */
-function buildMeetingEmail(meeting = {}, organizerEmail = '', opts = {}) {
+function buildMeetingEmail(meeting = {}, actionEmail = '', organizerEmail = '', opts = {}) {
   const action = (opts.action || 'created').toLowerCase();
   const notifyTarget = (opts.notify || '').toLowerCase(); // e.g. 'removed' when emailing removed users
   const startRaw = meeting.startDate || '';
@@ -69,31 +54,31 @@ function buildMeetingEmail(meeting = {}, organizerEmail = '', opts = {}) {
   let headline = 'Meeting Scheduled';
   let accentColor = '#0b78e3';
   // default introLine for organizer/admin notifications
-  let introLine = `You have a new meeting scheduled by ${organizerEmail}.`;
+  let introLine = `You have a new meeting scheduled by ${actionEmail}.`;
 
   // Action-specific adjustments
   if (action === 'updated') {
     subjectPrefix = 'Meeting Updated';
     headline = 'Meeting Updated';
     accentColor = '#f59e0b';
-    introLine = `The meeting has been updated by ${organizerEmail}. Please review the new details.`;
+    introLine = `The meeting has been updated by ${actionEmail}. Please review the new details.`;
   } else if (action === 'cancelled' || action === 'deleted') {
     subjectPrefix = 'Meeting Cancelled';
     headline = 'Meeting Cancelled';
     accentColor = '#ef4444';
-    introLine = `The meeting scheduled by ${organizerEmail} has been cancelled.`;
+    introLine = `The meeting scheduled by ${actionEmail} has been cancelled.`;
   } else if (action === 'candidates_removed') {
     // default organizer/manager wording
     subjectPrefix = 'Attendees Removed';
     headline = 'Attendees Removed from Meeting';
     accentColor = '#d946ef';
-    introLine = `Some attendees were removed from the meeting by ${organizerEmail}.`;
+    introLine = `Some attendees were removed from the meeting by ${actionEmail}.`;
 
     // If the email is targeted *to the removed candidates themselves*, change subject & intro
     if (notifyTarget === 'removed') {
       subjectPrefix = `You were removed from meeting`;
       headline = 'You were removed from this meeting';
-      introLine = `You have been removed from this meeting by ${organizerEmail}.`;
+      introLine = `You have been removed from this meeting by ${actionEmail}.`;
       // we might prefer a different accent for this personal notification
       accentColor = '#9b5cf6';
     }
@@ -153,6 +138,13 @@ function buildMeetingEmail(meeting = {}, organizerEmail = '', opts = {}) {
               <p style="color:#333; margin:0 0 12px;">Details:</p>
               <div style="padding:12px; background:#f4f6fb; border-radius:6px; color:#444;">
                 ${escapeHtml(meeting.description || meeting.reason || 'No additional details provided.')}
+              </div>
+
+              <div style="margin-top:12px;">
+                <p style="margin:0 0 8px; font-weight:600; color:#333;">Attendees</p>
+                <ul style="padding-left:18px; margin:0 0 8px 0; color:#555;">
+                  ${meeting.candidates.map(it => `<li>${escapeHtml(it.fullname)}</li>`).join('')}
+                </ul>
               </div>
 
               ${removedHtmlBlock}
