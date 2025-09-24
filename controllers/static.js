@@ -7,13 +7,53 @@ const homePage = async (req, res) => {
     let meetings = [];
     let users = [];
     let pastMeetings = [];
+    let pendingApproveMeetings = [];
     if(req.role === "admin"){
         rooms = await Room.find({});
         users = await Users.find({});
         meetings = await Meetings.find({}).populate("user").populate("room").populate("candidates").sort({ startDate: 1 }).lean().exec();
     }
     else{
-        meetings = await Meetings.find({
+        if(req.role === "manager"){
+            meetings = await Meetings.find({
+                $and: [
+                  {
+                $or: [
+                  { user: req.id },
+                  { candidates: req.id }
+                ]
+              },
+              { startDate: { $gt: new Date() } },
+              { isApproved: true } 
+            ]
+          })
+            .populate('user')
+            .populate('room')
+            .populate('candidates')
+            .sort({ startDate: 1 }) 
+            .lean()
+            .exec();
+        }
+        else{
+            meetings = await Meetings.find({
+                $and: [
+                  {
+                $or: [
+                  { user: req.id },
+                  { candidates: req.id }
+                ]
+              },
+              { startDate: { $gt: new Date() } },
+            ]
+          })
+            .populate('user')
+            .populate('room')
+            .populate('candidates')
+            .sort({ startDate: 1 }) 
+            .lean()
+            .exec();
+        }
+        pastMeetings = await Meetings.find({
             $and: [
               {
                 $or: [
@@ -21,7 +61,8 @@ const homePage = async (req, res) => {
                   { candidates: req.id }
                 ]
               },
-              { startDate: { $gt: new Date() } } 
+              { startDate: { $lt: new Date() } },
+              { isApproved: true } 
             ]
           })
             .populate('user')
@@ -31,7 +72,7 @@ const homePage = async (req, res) => {
             .lean()
             .exec();
 
-        pastMeetings = await Meetings.find({
+        pendingApproveMeetings = await Meetings.find({
             $and: [
               {
                 $or: [
@@ -39,7 +80,8 @@ const homePage = async (req, res) => {
                   { candidates: req.id }
                 ]
               },
-              { startDate: { $lt: new Date() } } 
+              { startDate: { $gt: new Date() } },
+              { isApproved: false } 
             ]
           })
             .populate('user')
@@ -53,7 +95,7 @@ const homePage = async (req, res) => {
         return {
             ...meeting,
             startDate: meeting.startDate.toLocaleString(),
-            endDate: meeting.endDate.toLocaleString()
+            endDate: meeting.endDate.toLocaleString(),
         }
     });
     pastMeetings = pastMeetings.map((meeting) => {
@@ -69,7 +111,8 @@ const homePage = async (req, res) => {
         rooms,
         meetings,
         users,
-        pastMeetings
+        pastMeetings,
+        pendingApproveMeetings
     });
 };
 

@@ -8,6 +8,6 @@ roomRouter.get("/:id",checkPermission(["admin"]), getRoom);
 roomRouter.post("/", checkPermission(["admin"]), createRoom);
 roomRouter.put("/:id", checkPermission(["admin"]), updateRoom);
 roomRouter.delete("/:id", checkPermission(["admin"]), deleteRoom);
-roomRouter.post("/available", checkPermission(["admin","manager"]), checkAvailability);
+roomRouter.post("/available", checkAvailability);
 
 module.exports = roomRouter;

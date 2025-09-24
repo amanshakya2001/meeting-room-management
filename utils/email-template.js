@@ -21,9 +21,35 @@ function formatDateToUI(inputDate) {
   return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
 }
 
+/**
+ * Helper: normalize a recipient item (string or object) into { display, email }
+ */
+function normalizeRecipient(item) {
+  if (!item) return { display: '', email: '' };
+  if (typeof item === 'string') {
+    const s = item.trim();
+    return { display: s, email: s.includes('@') ? s : '' };
+  }
+  const name = item.fullname || item.name || '';
+  const email = item.email || '';
+  const display = name && email ? `${name} <${email}>` : (name || email || String(item));
+  return { display, email: email || (item._id ? String(item._id) : '') };
+}
+
+/**
+ * buildMeetingEmail(meeting, actionEmail, organizerEmail, opts)
+ * - opts.action: 'created' | 'updated' | 'cancelled' | 'candidates_removed' | 'pending' ...
+ * - opts.removedCandidates: array (for candidates_removed)
+ * - opts.managers: array of recipients (for pending)
+ * - opts.admins: array of recipients (for pending)
+ * - opts.appUrl: base url for meeting link
+ *
+ * Returns: { subject, html, text, action, notifyList } where notifyList is an array
+ * of display/email strings (useful for sending emails to managers/admins).
+ */
 function buildMeetingEmail(meeting = {}, actionEmail = '', organizerEmail = '', opts = {}) {
   const action = (opts.action || 'created').toLowerCase();
-  const notifyTarget = (opts.notify || '').toLowerCase(); // e.g. 'removed' when emailing removed users
+  const notifyTarget = (opts.notify || '').toLowerCase(); // e.g. 'removed'
   const startRaw = meeting.startDate || '';
   const endRaw = meeting.endDate || '';
   const start = new Date(startRaw);
@@ -49,11 +75,31 @@ function buildMeetingEmail(meeting = {}, actionEmail = '', organizerEmail = '', 
     return (item._id ? String(item._id) : String(item));
   });
 
+  // --- Normalize managers/admins (for 'pending' action) ---
+  const managersRaw = Array.isArray(opts.managers) ? opts.managers : [];
+  const adminsRaw = Array.isArray(opts.admins) ? opts.admins : [];
+
+  const normManagers = managersRaw.map(normalizeRecipient).filter(r => r.display);
+  const normAdmins   = adminsRaw.map(normalizeRecipient).filter(r => r.display);
+
+  // Build unique notify lists (display strings and email strings)
+  const combined = [...normManagers, ...normAdmins];
+  const seenDisplays = new Set();
+  const notifyDisplays = [];
+  const notifyEmails = [];
+  combined.forEach(r => {
+    if (!r.display) return;
+    if (!seenDisplays.has(r.display)) {
+      seenDisplays.add(r.display);
+      notifyDisplays.push(r.display);
+      if (r.email) notifyEmails.push(r.email);
+    }
+  });
+
   // Default subject & copy
   let subjectPrefix = 'Meeting Scheduled';
   let headline = 'Meeting Scheduled';
   let accentColor = '#0b78e3';
-  // default introLine for organizer/admin notifications
   let introLine = `You have a new meeting scheduled by ${actionEmail}.`;
 
   // Action-specific adjustments
@@ -68,30 +114,30 @@ function buildMeetingEmail(meeting = {}, actionEmail = '', organizerEmail = '', 
     accentColor = '#ef4444';
     introLine = `The meeting scheduled by ${actionEmail} has been cancelled.`;
   } else if (action === 'candidates_removed') {
-    // default organizer/manager wording
     subjectPrefix = 'Attendees Removed';
     headline = 'Attendees Removed from Meeting';
     accentColor = '#d946ef';
     introLine = `Some attendees were removed from the meeting by ${actionEmail}.`;
 
-    // If the email is targeted *to the removed candidates themselves*, change subject & intro
     if (notifyTarget === 'removed') {
       subjectPrefix = `You were no longer invited to meeting`;
       headline = 'You were no longer invited to this meeting';
       introLine = `You have been no longer invited to this meeting by ${actionEmail}.`;
-      // we might prefer a different accent for this personal notification
       accentColor = '#9b5cf6';
     }
+  } else if (action === 'pending') {
+    // NEW: meeting created but requires approval -> send to managers + admins
+    subjectPrefix = 'Meeting Pending Approval';
+    headline = 'Meeting Pending Approval';
+    accentColor = '#6b7280'; // neutral gray for pending
+    introLine = `A new meeting created by ${actionEmail} requires approval. Please review and approve or reject.`;
   }
 
-  // Build subject: for personal removed-notice, make subject direct
-  const subject = (action === 'candidates_removed' && notifyTarget === 'removed')
-    ? `${subjectPrefix}: ${roomName} — ${startLabel}`                    // "You were removed from meeting: Room — date"
-    : `${subjectPrefix}: ${roomName} — ${startLabel}`;                 // other actions
+  const subject = `${subjectPrefix}: ${roomName} — ${startLabel}`;
 
   const base = (opts.appUrl || process.env.APP_URL || 'https://app.example.com').replace(/\/$/, '');
   const meetingUrl = meeting._id ? `${base}/meetings/${meeting._id}` : base;
-  const ctaText = (action === 'cancelled') ? 'View Details' : 'View Meeting';
+  const ctaText = (action === 'cancelled') ? 'View Details' : (action === 'pending' ? 'Review & Approve' : 'View Meeting');
 
   // Removed candidates blocks (only shown when action === 'candidates_removed' and list present)
   const removedHtmlBlock = (action === 'candidates_removed' && removedListDisplay.length > 0)
@@ -105,6 +151,20 @@ function buildMeetingEmail(meeting = {}, actionEmail = '', organizerEmail = '', 
 
   const removedTextBlock = (action === 'candidates_removed' && removedListDisplay.length > 0)
     ? `Removed attendees:\n- ${removedListDisplay.join('\n- ')}\n`
+    : '';
+
+  // Pending approval block (HTML + text)
+  const pendingHtmlBlock = (action === 'pending' && notifyDisplays.length > 0)
+    ? `<div style="margin-top:12px;">
+         <p style="margin:0 0 8px; font-weight:600; color:#333;">Requires approval from</p>
+         <ul style="padding-left:18px; margin:0 0 8px 0; color:#555;">
+           ${notifyDisplays.map(it => `<li>${escapeHtml(it)}</li>`).join('')}
+         </ul>
+       </div>`
+    : '';
+
+  const pendingTextBlock = (action === 'pending' && notifyDisplays.length > 0)
+    ? `Requires approval from:\n- ${notifyDisplays.join('\n- ')}\n`
     : '';
 
   // HTML body
@@ -143,11 +203,12 @@ function buildMeetingEmail(meeting = {}, actionEmail = '', organizerEmail = '', 
               <div style="margin-top:12px;">
                 <p style="margin:0 0 8px; font-weight:600; color:#333;">Attendees</p>
                 <ul style="padding-left:18px; margin:0 0 8px 0; color:#555;">
-                  ${meeting.candidates.map(it => `<li>${escapeHtml(it.fullname)}</li>`).join('')}
+                  ${ (Array.isArray(meeting.candidates) ? meeting.candidates.map(it => `<li>${escapeHtml(it.fullname || it.name || String(it))}</li>`).join('') : '') }
                 </ul>
               </div>
 
               ${removedHtmlBlock}
+              ${pendingHtmlBlock}
             </div>
 
             <div style="text-align:center; margin-top:18px;">
@@ -174,11 +235,12 @@ function buildMeetingEmail(meeting = {}, actionEmail = '', organizerEmail = '', 
     created: 'Scheduled',
     updated: 'Updated',
     cancelled: 'Cancelled',
-    candidates_removed: 'Attendees Removed'
+    candidates_removed: 'Attendees Removed',
+    pending: 'Pending Approval'
   };
   const plainHeader = `${reason} — ${actionTextMap[action] || 'Scheduled'}`;
 
-  const text = [
+  const textParts = [
     plainHeader,
     '',
     `When: ${startLabel}${endLabel ? ` — ${endLabel}` : ''}`,
@@ -188,14 +250,27 @@ function buildMeetingEmail(meeting = {}, actionEmail = '', organizerEmail = '', 
     '',
     'Details:',
     (meeting.description || meeting.reason || 'No additional details provided.'),
-    '',
-    removedTextBlock,
-    `${ctaText}: ${meetingUrl}`,
-    '',
-    action === 'cancelled' ? `NOTE: This meeting has been cancelled.` : `If you can't attend, please contact ${organizerEmail}.`
-  ].join('\n');
+    ''
+  ];
 
-  return { subject, html, text, action };
+  if (removedTextBlock) textParts.push(removedTextBlock);
+  if (pendingTextBlock) textParts.push(pendingTextBlock);
+
+  textParts.push(`${ctaText}: ${meetingUrl}`);
+  textParts.push('');
+  textParts.push(action === 'cancelled' ? `NOTE: This meeting has been cancelled.` : `If you can't attend, please contact ${organizerEmail}.`);
+
+  const text = textParts.join('\n');
+
+  // Return notifyList (emails) and notifyDisplay for convenience to the caller when action === 'pending'
+  return {
+    subject,
+    html,
+    text,
+    action,
+    notifyList: notifyEmails,     // array of email strings (may be empty if not provided)
+    notifyDisplay: notifyDisplays // human readable display strings
+  };
 }
 
 module.exports = { buildMeetingEmail };

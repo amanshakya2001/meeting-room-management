@@ -27,6 +27,10 @@ const meetingSchema = new Schema({
         type: Date,
         required: true,
     },
+    isApproved: {
+        type: Boolean,
+        default: false,
+    },
 },{
     timestamps: true,
 });
