@@ -67,7 +67,7 @@ function escapeHtml(str = '') {
   
     // meeting URL (optional)
     const base = (opts.appUrl || process.env.APP_URL || 'https://app.example.com').replace(/\/$/, '');
-    const meetingUrl = meeting._id ? `${base}/meetings/${meeting._id}` : base;
+    const meetingUrl = `${base}`;
   
     // CTA text - different for cancelled
     const ctaText = (action === 'cancelled') ? 'View Details' : 'View Meeting';
