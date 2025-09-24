@@ -1,0 +1,106 @@
+<%- include('partials/header') %>
+    <section class="min-vh-100 bg-light" id="update-room">
+      <div class="container py-5">
+        <div class="row justify-content-center">
+          <div class="col-12 col-lg-8 col-xl-6">
+            <div class="card shadow-sm border-0">
+              <div class="card-body p-4 p-md-5">
+                <div class="mb-4">
+                  <h2 class="h4 mb-1">Update Room</h2>
+                  <p class="text-muted mb-0">Modify room name and capacity, then save your changes.</p>
+                </div>
+
+                <div id="error" class="alert alert-danger d-none" role="alert"></div>
+                <div id="success" class="alert alert-success d-none" role="alert"></div>
+
+                <form class="row g-3" onsubmit="return false;">
+                  <div class="col-12">
+                    <label class="form-label" for="room-name">Room Name</label>
+                    <input type="text" id="room-name" name="name" class="form-control" placeholder="e.g., Ocean View" value="<%= room.name %>" required>
+                    <div class="form-text">Provide a clear and unique name for the room.</div>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label" for="room-capacity">Capacity</label>
+                    <input type="number" id="room-capacity" name="capacity" class="form-control" placeholder="e.g., 10" value="<%= room.capacity %>" min="1" required>
+                    <div class="form-text">Total number of people the room can accommodate.</div>
+                  </div>
+                  <div class="col-12 pt-2">
+                    <button type="button" id="updateRoomBtn" class="btn btn-primary" onclick="updateRoom('<%= room._id %>')">
+                      <span id="updateSpinner" class="spinner-border spinner-border-sm me-2 align-text-top d-none" role="status" aria-hidden="true"></span>
+                      <span id="updateText">Save Changes</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <script>
+      function setInvalid(el, isInvalid) {
+        if (!el) return;
+        el.classList.toggle('is-invalid', !!isInvalid);
+      }
+
+      function updateRoom(roomId) {
+        const nameEl = document.getElementById('room-name');
+        const capacityEl = document.getElementById('room-capacity');
+        const errorAlert = document.getElementById('error');
+        const successAlert = document.getElementById('success');
+        const btn = document.getElementById('updateRoomBtn');
+        const spinner = document.getElementById('updateSpinner');
+        const text = document.getElementById('updateText');
+
+        // reset alerts
+        errorAlert.classList.add('d-none');
+        successAlert.classList.add('d-none');
+
+        // simple validation
+        const name = nameEl.value.trim();
+        const capacity = parseInt(capacityEl.value, 10);
+        let valid = true;
+        setInvalid(nameEl, !name);
+        setInvalid(capacityEl, !(capacity > 0));
+        if (!name || !(capacity > 0)) {
+          valid = false;
+          errorAlert.textContent = 'Please enter a valid name and capacity (> 0).';
+          errorAlert.classList.remove('d-none');
+          return;
+        }
+
+        // UI busy state
+        btn.setAttribute('disabled', 'disabled');
+        spinner.classList.remove('d-none');
+        text.textContent = 'Saving...';
+
+        fetch(`/api/room/${roomId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, capacity })
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (data.error) {
+            errorAlert.textContent = data.error;
+            errorAlert.classList.remove('d-none');
+            return;
+          }
+          successAlert.textContent = 'Room updated successfully';
+          successAlert.classList.remove('d-none');
+          setTimeout(() => { window.location.href = '/'; }, 800);
+        })
+        .catch(err => {
+          console.error('Error updating room:', err);
+          errorAlert.textContent = 'Something went wrong while updating the room.';
+          errorAlert.classList.remove('d-none');
+        })
+        .finally(() => {
+          btn.removeAttribute('disabled');
+          spinner.classList.add('d-none');
+          text.textContent = 'Save Changes';
+        });
+      }
+    </script>
+<%- include('partials/footer') %>

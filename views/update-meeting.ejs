@@ -1,0 +1,405 @@
+<%- include('partials/header') %>
+    <section class="min-vh-100 bg-light" id="update-meeting">
+        <div class="container py-5">
+            <div class="row justify-content-center">
+                <div class="col-12 col-lg-10 col-xl-8">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-body p-4 p-md-5">
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <div>
+                                    <h2 class="h4 mb-1">Update Meeting</h2>
+                                    <p class="text-muted mb-0">Edit details, adjust time, change room and attendees.</p>
+                                </div>
+                            </div>
+
+                            <form>
+                                <div id="error" class="alert alert-danger d-none" role="alert"></div>
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-6">
+                                        <label for="start-date" class="form-label">Start</label>
+                                        <input type="datetime-local" name="start-date" id="start-date" class="form-control" placeholder="Select start date & time" required>
+                                        <div id="start-invalid" class="invalid-feedback">Start time cannot be in the past.</div>
+                                        <div class="form-text">Choose the meeting start date and time.</div>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label for="end-date" class="form-label">End</label>
+                                        <input type="datetime-local" name="end-date" id="end-date" class="form-control" placeholder="Select end date & time" required>
+                                        <div id="end-invalid" class="invalid-feedback">End time must be after the start time.</div>
+                                        <div class="form-text">End time must be after the start time.</div>
+                                    </div>
+                                </div>
+                                <!-- Availability is auto-checked on date changes; button removed -->
+                                <div id="available-rooms" class="mb-4"></div>
+                                <div id="meetingReason" class="mb-3">
+                                    <label for="reason" class="form-label">Meeting Title</label>
+                                    <input type="text" name="reason" id="reason" class="form-control" placeholder="e.g., Quarterly Planning, Sync with Design" maxlength="120">
+                                    <div class="form-text">Provide a short and descriptive title for your meeting.</div>
+                                </div>
+                                <div id="attendees" class="row gy-3 mb-4">
+                                    <div class="col-12">
+                                        <label class="form-label">Select Attendees</label>
+                                        <div class="form-text">Move users between lists to set meeting attendees.</div>
+                                    </div>
+                                    <div class="col-12 col-md-5">
+                                      <h6 class="mb-2">Available Users</h6>
+                                      <select id="availableUsers" multiple class="form-select" size="10"></select>
+                                    </div>
+                                    <div class="col-12 col-md-2 d-flex flex-row flex-md-column justify-content-center align-items-center gap-2">
+                                      <button type="button" id="addUser" class="btn btn-sm btn-primary w-100">&gt;&gt;</button>
+                                      <button type="button" id="removeUser" class="btn btn-sm btn-outline-danger w-100">&lt;&lt;</button>
+                                    </div>
+                                    <div class="col-12 col-md-5">
+                                      <h6 class="mb-2">Selected Users</h6>
+                                      <select id="selectedUsers" name="attendees" multiple class="form-select" size="10"></select>
+                                    </div>
+                                </div>
+                                <div id="updateMeeting" class="pt-2">
+                                    <button type="button" id="updateMeetingBtn" class="btn btn-success">
+                                        <span id="updateSpinner" class="spinner-border spinner-border-sm me-2 align-text-top d-none" role="status" aria-hidden="true"></span>
+                                        <span id="updateText">Save Changes</span>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <script id="meeting-data" type="application/json"><%- JSON.stringify({
+        meeting: (typeof meeting !== 'undefined' ? meeting : {}),
+        candidates: (typeof candidates !== 'undefined' ? candidates : [])
+    }) %></script>
+    <script>
+        // Server data
+        const __RAW = document.getElementById('meeting-data');
+        let MEETING = {};
+        let CANDIDATES = [];
+        try {
+            const parsed = JSON.parse(__RAW?.textContent || '{}');
+            MEETING = parsed.meeting || {};
+            CANDIDATES = parsed.candidates || [];
+        } catch (e) { console.warn('Failed parsing meeting-data', e); }
+
+        // helpers: datetime formatting and validation
+        (function initDateTimeValidation() {
+            const startInput = document.getElementById("start-date");
+            const endInput = document.getElementById("end-date");
+            const errorAlert = document.getElementById("error");
+
+            function pad(n){ return String(n).padStart(2,'0'); }
+            function formatLocalForInput(d) {
+                const yyyy = d.getFullYear();
+                const mm = pad(d.getMonth() + 1);
+                const dd = pad(d.getDate());
+                const hh = pad(d.getHours());
+                const mi = pad(d.getMinutes());
+                return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+            }
+
+            function setMins() {
+                const now = new Date();
+                const nowStr = formatLocalForInput(now);
+                if (startInput) startInput.min = nowStr;
+                if (endInput) endInput.min = startInput && startInput.value ? startInput.value : nowStr;
+            }
+
+            function setInvalid(el, isInvalid) {
+                if (!el) return;
+                el.classList.toggle('is-invalid', !!isInvalid);
+            }
+
+            function validateDateTimes(showAlert = false) {
+                if (!startInput || !endInput) return false;
+                const startVal = startInput.value;
+                const endVal = endInput.value;
+                let valid = true;
+
+                const now = new Date();
+                if (!startVal) {
+                    valid = false;
+                } else {
+                    const s = new Date(startVal);
+                    if (s < now) valid = false;
+                }
+                setInvalid(startInput, !startVal || (new Date(startVal) < now));
+
+                if (!endVal || !startVal) {
+                    setInvalid(endInput, true);
+                    valid = false;
+                } else {
+                    const s = new Date(startVal);
+                    const e = new Date(endVal);
+                    if (!(e > s)) {
+                        setInvalid(endInput, true);
+                        valid = false;
+                    } else {
+                        setInvalid(endInput, false);
+                    }
+                }
+
+                if (showAlert && !valid) {
+                    errorAlert.classList.remove('d-none');
+                    errorAlert.textContent = 'Please select a valid time range: start cannot be in the past and end must be after start.';
+                } else if (errorAlert && !errorAlert.classList.contains('d-none') && valid) {
+                    errorAlert.classList.add('d-none');
+                }
+                return valid;
+            }
+
+            // Prefill values from MEETING
+            try {
+                if (MEETING.startDate) {
+                    const s = new Date(MEETING.startDate);
+                    if (!isNaN(s)) startInput.value = formatLocalForInput(s);
+                }
+                if (MEETING.endDate) {
+                    const e = new Date(MEETING.endDate);
+                    if (!isNaN(e)) endInput.value = formatLocalForInput(e);
+                }
+            } catch(_) {}
+
+            // initialize mins and listeners
+            setMins();
+            startInput && startInput.addEventListener('change', () => {
+                setMins();
+                validateDateTimes(false);
+                // auto check availability when valid
+                if (validateDateTimes(false) && typeof window.__debouncedAvailability === 'function') {
+                    window.__debouncedAvailability();
+                }
+            });
+            endInput && endInput.addEventListener('change', () => {
+                validateDateTimes(false);
+                if (validateDateTimes(false) && typeof window.__debouncedAvailability === 'function') {
+                    window.__debouncedAvailability();
+                }
+            });
+
+            // expose for other handlers
+            window.__validateDateTimes = validateDateTimes;
+            window.__setDateMins = setMins;
+        })();
+
+        // attendees UI init from server data
+        (function initAttendees() {
+            const available = document.getElementById("availableUsers");
+            const selected = document.getElementById("selectedUsers");
+            function normalizeId(v){
+                if (!v) return null;
+                if (typeof v === 'string') return v;
+                return v._id || v.id || v.userId || (v.user && (v.user._id || v.user.id || v.user.userId)) || null;
+            }
+
+            const selectedIds = new Set((MEETING.candidates || []).map(c => normalizeId(c)).filter(Boolean));
+
+            (CANDIDATES || []).forEach(u => {
+                const id = normalizeId(u);
+                const name = u.fullname || u.name || (u.user && (u.user.fullname || u.user.name)) || u.email || 'User';
+                const email = u.email || (u.user && u.user.email) || '';
+                const opt = document.createElement('option');
+                opt.value = id || '';
+                opt.textContent = email ? `${name} (${email})` : name;
+                if (selectedIds.has(opt.value)) {
+                    selected.appendChild(opt);
+                } else {
+                    available.appendChild(opt);
+                }
+            });
+
+            const reasonEl = document.getElementById('reason');
+            if (MEETING.reason && reasonEl) reasonEl.value = MEETING.reason;
+        })();
+
+        // dual list controls
+        document.getElementById("addUser").addEventListener("click", function () {
+          const available = document.getElementById("availableUsers");
+          const selected = document.getElementById("selectedUsers");
+          [...available.selectedOptions].forEach(opt => { selected.appendChild(opt); });
+        });
+        document.getElementById("removeUser").addEventListener("click", function () {
+          const available = document.getElementById("availableUsers");
+          const selected = document.getElementById("selectedUsers");
+          [...selected.selectedOptions].forEach(opt => { available.appendChild(opt); });
+        });
+
+        // availability
+        (function initRoomSelect() {
+            const availableRoomsDiv = document.getElementById("available-rooms");
+            const labelElement = document.createElement("label");
+            labelElement.className = "form-label";
+            labelElement.innerHTML = "Room";
+            const selectElement = document.createElement("select");
+            selectElement.id = "room";
+            selectElement.name = "room";
+            selectElement.className = "form-select";
+            if (MEETING.room && (MEETING.room.name || MEETING.room._id || MEETING.room.id)) {
+                const opt = document.createElement('option');
+                opt.value = MEETING.room._id || MEETING.room.id;
+                opt.textContent = MEETING.room.name || 'Current Room';
+                selectElement.appendChild(opt);
+            }
+            availableRoomsDiv.appendChild(labelElement);
+            availableRoomsDiv.appendChild(selectElement);
+
+            // hint if we can't populate the select with a valid option later
+            const hint = document.createElement('div');
+            hint.id = 'current-room-hint';
+            hint.className = 'form-text text-warning d-none';
+            if (MEETING.room && (MEETING.room.name || MEETING.room._id || MEETING.room.id)) {
+                const roomName = MEETING.room.name || 'Unknown';
+                hint.textContent = `Current room: ${roomName}. It may be unavailable for the selected time.`;
+            } else {
+                hint.textContent = 'Current room could not be determined.';
+            }
+            availableRoomsDiv.appendChild(hint);
+        })();
+
+        // debounce helper
+        function debounce(fn, delay){
+            let t; return function(){ clearTimeout(t); t = setTimeout(() => fn.apply(this, arguments), delay); };
+        }
+
+        // shared availability fetcher
+        function requestAvailability() {
+            const startEl = document.getElementById("start-date");
+            const endEl = document.getElementById("end-date");
+            const errorAlert = document.getElementById("error");
+            if (!window.__validateDateTimes(true)) { return; }
+            const checkBtn = document.getElementById("checkAvailability");
+            const checkSpinner = document.getElementById("checkSpinner");
+            const checkText = document.getElementById("checkText");
+            if (checkBtn) checkBtn.setAttribute("disabled", "disabled");
+            if (checkSpinner) checkSpinner.classList.remove("d-none");
+            if (checkText) checkText.textContent = "Checking...";
+
+            const startDate = startEl.value;
+            const endDate = endEl.value;
+
+            // get/select existing select element
+            const selectElement = document.getElementById("room");
+            const hintEl = document.getElementById('current-room-hint');
+            // remember last selected between rapid changes; fallback to current meeting room
+            const currentRoomId = (MEETING.room && (MEETING.room._id || MEETING.room.id)) || '';
+            const previousSelected = window.__lastSelectedRoomIdUpdate || (selectElement && selectElement.value) || currentRoomId || '';
+            window.__lastSelectedRoomIdUpdate = previousSelected;
+
+            // loading state on select
+            if (selectElement) {
+                selectElement.setAttribute('disabled','disabled');
+                selectElement.innerHTML = '';
+                const loadingOpt = document.createElement('option');
+                loadingOpt.textContent = 'Loading...';
+                loadingOpt.value = '';
+                selectElement.appendChild(loadingOpt);
+            }
+
+            fetch("/api/room/available", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ startDate, endDate })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.error) {
+                    errorAlert.classList.remove("d-none");
+                    errorAlert.textContent = data.error;
+                    return;
+                }
+                errorAlert.classList.add("d-none");
+                const selectElement = document.getElementById("room");
+                selectElement.innerHTML = "";
+                (data.availableRooms || []).forEach(room => {
+                    const roomElement = document.createElement("option");
+                    roomElement.value = room._id;
+                    roomElement.innerHTML = room.name;
+                    selectElement.appendChild(roomElement);
+                });
+                // restore selection with priority: previousSelected -> currentRoomId
+                let target = previousSelected;
+                if (!(target && [...selectElement.options].some(o => o.value === target))) {
+                    target = currentRoomId;
+                }
+                if (target && [...selectElement.options].some(o => o.value === target)) {
+                    selectElement.value = target;
+                    window.__lastSelectedRoomIdUpdate = target;
+                    if (hintEl) hintEl.classList.add('d-none');
+                } else {
+                    // could not restore; show hint if we know current room
+                    if (hintEl && currentRoomId) hintEl.classList.remove('d-none');
+                    window.__lastSelectedRoomIdUpdate = selectElement.value || '';
+                }
+                selectElement.removeAttribute('disabled');
+            })
+            .catch(error => { console.error(error); })
+            .finally(() => {
+                if (checkBtn) checkBtn.removeAttribute("disabled");
+                if (checkSpinner) checkSpinner.classList.add("d-none");
+                if (checkText) checkText.textContent = "Check Availability";
+            });
+        }
+
+        // expose debounced fn and bind button
+        window.__debouncedAvailability = debounce(requestAvailability, 400);
+        (function(){
+            const btn = document.getElementById("checkAvailability");
+            if (btn) btn.addEventListener("click", function(e){ e.preventDefault(); requestAvailability(); });
+        })();
+
+        // update meeting
+        document.getElementById("updateMeetingBtn").addEventListener("click", function(e) {
+            e.preventDefault();
+            const errorAlert = document.getElementById("error");
+            if (!window.__validateDateTimes(true)) { return; }
+            const reasonEl = document.getElementById("reason");
+            const roomEl = document.getElementById("room");
+            const reason = reasonEl ? reasonEl.value.trim() : "";
+            if (!roomEl) {
+                errorAlert.classList.remove("d-none");
+                errorAlert.textContent = "Please check availability and select a room.";
+                return;
+            }
+            if (!reason) {
+                reasonEl && reasonEl.classList.add('is-invalid');
+                errorAlert.classList.remove("d-none");
+                errorAlert.textContent = "Please enter a meeting title.";
+                return;
+            } else {
+                reasonEl && reasonEl.classList.remove('is-invalid');
+            }
+
+            const btn = document.getElementById("updateMeetingBtn");
+            const spinner = document.getElementById("updateSpinner");
+            const text = document.getElementById("updateText");
+            btn.setAttribute("disabled", "disabled");
+            spinner.classList.remove("d-none");
+            text.textContent = "Saving...";
+            const attendees = [...document.getElementById("selectedUsers").options].map(opt => opt.value);
+            const startDate = document.getElementById("start-date").value;
+            const endDate = document.getElementById("end-date").value;
+            const room = roomEl.value;
+
+            fetch(`/api/meeting/${MEETING._id || MEETING.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ reason, room, candidates: attendees, startDate, endDate })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.error) {
+                    errorAlert.classList.remove("d-none");
+                    errorAlert.textContent = data.error;
+                    return;
+                }
+                errorAlert.classList.add("d-none");
+                window.location.href = "/";
+            })
+            .catch(error => { console.error(error); })
+            .finally(() => {
+                btn.removeAttribute("disabled");
+                spinner.classList.add("d-none");
+                text.textContent = "Save Changes";
+            });
+        });
+    </script>
+<%- include('partials/footer') %>

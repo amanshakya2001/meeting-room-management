@@ -1,0 +1,358 @@
+<%- include('partials/header') %>
+    <section class="min-vh-100 bg-light" id="book-meeting">
+        <div class="container py-5">
+            <div class="row justify-content-center">
+                <div class="col-12 col-lg-10 col-xl-8">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-body p-4 p-md-5">
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <div>
+                                    <h2 class="h4 mb-1">Book a Meeting</h2>
+                                    <p class="text-muted mb-0">Pick a time, pick a room, invite attendees.</p>
+                                </div>
+                            </div>
+                    <form>
+                        <div id="error" class="alert alert-danger d-none" role="alert"></div>
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">  
+                                <label for="start-date" class="form-label">Start</label>
+                                <input type="datetime-local" name="start-date" id="start-date" class="form-control" placeholder="Select start date & time" required>
+                                <div id="start-invalid" class="invalid-feedback">Start time cannot be in the past.</div>
+                                <div class="form-text">Choose the meeting start date and time.</div>
+                            </div>
+                            <div class="col-12 col-md-6">  
+                                <label for="end-date" class="form-label">End</label>
+                                <input type="datetime-local" name="end-date" id="end-date" class="form-control" placeholder="Select end date & time" required>
+                                <div id="end-invalid" class="invalid-feedback">End time must be after the start time.</div>
+                                <div class="form-text">End time must be after the start time.</div>
+                            </div>
+                        </div>
+                        <!-- Availability is auto-checked on date changes; button removed -->
+                        <div id="available-rooms" class="mb-4"></div>
+                        <div id="meetingReason" class="mb-3 d-none">  
+                            <label for="reason" class="form-label">Meeting Title</label>
+                            <input type="text" name="reason" id="reason" class="form-control" placeholder="e.g., Quarterly Planning, Sync with Design" maxlength="120">
+                            <div class="form-text">Provide a short and descriptive title for your meeting.</div>
+                        </div>
+                        <div id="attendees" class="row gy-3 mb-4 d-none">
+                            <div class="col-12">
+                                <label class="form-label">Select Attendees</label>
+                                <div class="form-text">Move users between lists to invite them to the meeting.</div>
+                            </div>
+                            <div class="col-12 col-md-5">
+                              <h6 class="mb-2">Available Users</h6>
+                              <select id="availableUsers" multiple class="form-select" size="10">
+                                <% candidates.forEach(function(candidate) { %>
+                                  <option value="<%= candidate.id %>">
+                                    <%= candidate.fullname %> (<%= candidate.email %>)
+                                  </option>
+                                <% }) %>
+                              </select>
+                            </div>
+                            <div class="col-12 col-md-2 d-flex flex-row flex-md-column justify-content-center align-items-center gap-2">
+                              <button type="button" id="addUser" class="btn btn-sm btn-primary w-100">&gt;&gt;</button>
+                              <button type="button" id="removeUser" class="btn btn-sm btn-outline-danger w-100">&lt;&lt;</button>
+                            </div>
+                            <div class="col-12 col-md-5">
+                              <h6 class="mb-2">Selected Users</h6>
+                              <select id="selectedUsers" name="attendees" multiple class="form-select" size="10">
+                                <!-- Selected options will appear here -->
+                              </select>
+                            </div>
+                        </div>
+                        <div id="bookMeeting" class="pt-2 d-none">
+                            <button type="button" id="bookMeetingBtn" class="btn btn-success">
+                                <span id="bookSpinner" class="spinner-border spinner-border-sm me-2 align-text-top d-none" role="status" aria-hidden="true"></span>
+                                <span id="bookText">Book Meeting</span>
+                            </button>
+                        </div>
+                    </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>  
+    <script>
+        // helpers: datetime formatting and validation
+        (function initDateTimeValidation() {
+            const startInput = document.getElementById("start-date");
+            const endInput = document.getElementById("end-date");
+            const errorAlert = document.getElementById("error");
+
+            function formatLocalForInput(d) {
+                const pad = n => String(n).padStart(2, '0');
+                const yyyy = d.getFullYear();
+                const mm = pad(d.getMonth() + 1);
+                const dd = pad(d.getDate());
+                const hh = pad(d.getHours());
+                const mi = pad(d.getMinutes());
+                return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+            }
+
+            function setMins() {
+                const now = new Date();
+                const nowStr = formatLocalForInput(now);
+                if (startInput) startInput.min = nowStr;
+                if (endInput) endInput.min = startInput && startInput.value ? startInput.value : nowStr;
+            }
+
+            function setInvalid(el, isInvalid) {
+                if (!el) return;
+                el.classList.toggle('is-invalid', !!isInvalid);
+            }
+
+            function validateDateTimes(showAlert = false) {
+                if (!startInput || !endInput) return false;
+                const startVal = startInput.value;
+                const endVal = endInput.value;
+                let valid = true;
+
+                const now = new Date();
+                if (!startVal) {
+                    valid = false;
+                } else {
+                    const s = new Date(startVal);
+                    if (s < now) valid = false;
+                }
+                setInvalid(startInput, !valid || !startVal || (new Date(startVal) < now));
+
+                if (!endVal || !startVal) {
+                    setInvalid(endInput, true);
+                    valid = false;
+                } else {
+                    const s = new Date(startVal);
+                    const e = new Date(endVal);
+                    if (!(e > s)) {
+                        setInvalid(endInput, true);
+                        valid = false;
+                    } else {
+                        setInvalid(endInput, false);
+                    }
+                }
+
+                if (showAlert && !valid) {
+                    errorAlert.classList.remove('d-none');
+                    errorAlert.textContent = 'Please select a valid time range: start cannot be in the past and end must be after start.';
+                } else if (errorAlert && !errorAlert.classList.contains('d-none') && valid) {
+                    errorAlert.classList.add('d-none');
+                }
+                return valid;
+            }
+
+            // initialize mins and listeners
+            setMins();
+            startInput && startInput.addEventListener('change', () => {
+                setMins();
+                validateDateTimes(false);
+                // auto check availability when dates are valid
+                if (validateDateTimes(false) && typeof window.__debouncedAvailability === 'function') {
+                    window.__debouncedAvailability();
+                }
+            });
+            endInput && endInput.addEventListener('change', () => {
+                validateDateTimes(false);
+                if (validateDateTimes(false) && typeof window.__debouncedAvailability === 'function') {
+                    window.__debouncedAvailability();
+                }
+            });
+
+            // expose for other handlers
+            window.__validateDateTimes = validateDateTimes;
+            window.__setDateMins = setMins;
+        })();
+
+        // add user to selected users
+        document.getElementById("addUser").addEventListener("click", function () {
+          const available = document.getElementById("availableUsers");
+          const selected = document.getElementById("selectedUsers");
+
+          [...available.selectedOptions].forEach(opt => {
+            selected.appendChild(opt);
+          });
+        });
+
+        // remove user from selected users
+        document.getElementById("removeUser").addEventListener("click", function () {
+          const available = document.getElementById("availableUsers");
+          const selected = document.getElementById("selectedUsers");
+
+          [...selected.selectedOptions].forEach(opt => {
+            available.appendChild(opt);
+          });
+        });
+
+        // debounce helper
+        function debounce(fn, delay){
+          let t; return function(){ clearTimeout(t); t = setTimeout(() => fn.apply(this, arguments), delay); };
+        }
+
+        // shared availability fetcher
+        function requestAvailability() {
+            const startEl = document.getElementById("start-date");
+            const endEl = document.getElementById("end-date");
+            const errorAlert = document.getElementById("error");
+            if (!window.__validateDateTimes(true)) return;
+
+            const checkBtn = document.getElementById("checkAvailability");
+            const checkSpinner = document.getElementById("checkSpinner");
+            const checkText = document.getElementById("checkText");
+            if (checkBtn) checkBtn.setAttribute("disabled", "disabled");
+            if (checkSpinner) checkSpinner.classList.remove("d-none");
+            if (checkText) checkText.textContent = "Checking...";
+
+            const startDate = startEl.value;
+            const endDate = endEl.value;
+
+            // ensure UI containers visible
+            const availableRoomsDiv = document.getElementById("available-rooms");
+            let selectElement = document.getElementById("room");
+            if (!selectElement) {
+                // build label + select once
+                const labelElement = document.createElement("label");
+                labelElement.className = "form-label";
+                labelElement.innerHTML = "Available Rooms";
+                selectElement = document.createElement("select");
+                selectElement.id = "room";
+                selectElement.name = "room";
+                selectElement.className = "form-select";
+                availableRoomsDiv.innerHTML = "";
+                availableRoomsDiv.appendChild(labelElement);
+                availableRoomsDiv.appendChild(selectElement);
+                document.getElementById("meetingReason").classList.remove("d-none");
+                document.getElementById("attendees").classList.remove("d-none");
+                document.getElementById("bookMeeting").classList.remove("d-none");
+            }
+
+            // persist last selected room across rapid changes
+            const previousSelected = window.__lastSelectedRoomId || selectElement.value || "";
+            window.__lastSelectedRoomId = previousSelected;
+
+            // loading state on select
+            selectElement.setAttribute('disabled','disabled');
+            selectElement.innerHTML = "";
+            const loadingOpt = document.createElement('option');
+            loadingOpt.textContent = 'Loading...';
+            loadingOpt.value = '';
+            selectElement.appendChild(loadingOpt);
+
+            fetch("api/room/available", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ startDate, endDate })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.error) {
+                    errorAlert.classList.remove("d-none");
+                    errorAlert.textContent = data.error;
+                    return;
+                }
+                errorAlert.classList.add("d-none");
+                const availableRooms = data.availableRooms || [];
+                selectElement.innerHTML = "";
+                availableRooms.forEach(room => {
+                    const roomElement = document.createElement("option");
+                    roomElement.value = room._id;
+                    roomElement.innerHTML = room.name;
+                    selectElement.appendChild(roomElement);
+                });
+                // restore previous selection if still available
+                if (previousSelected && [...selectElement.options].some(o => o.value === previousSelected)) {
+                    selectElement.value = previousSelected;
+                } else {
+                    // update persisted id to new selection
+                    window.__lastSelectedRoomId = selectElement.value || '';
+                }
+                selectElement.removeAttribute('disabled');
+            })
+            .catch(error => { console.error(error); })
+            .finally(() => {
+                const btn = document.getElementById("checkAvailability");
+                const spinner = document.getElementById("checkSpinner");
+                const text = document.getElementById("checkText");
+                if (btn) btn.removeAttribute("disabled");
+                if (spinner) spinner.classList.add("d-none");
+                if (text) text.textContent = "Check Availability";
+            });
+        }
+
+        // expose debounced fn and bind button
+        window.__debouncedAvailability = debounce(requestAvailability, 400);
+        (function(){
+          const btn = document.getElementById("checkAvailability");
+          if (btn) btn.addEventListener("click", function(e){ e.preventDefault(); requestAvailability(); });
+        })();
+
+        // book meeting
+        document.getElementById("bookMeetingBtn").addEventListener("click", function(e) {
+            e.preventDefault();
+            const errorAlert = document.getElementById("error");
+            // validation
+            if (!window.__validateDateTimes(true)) {
+                return;
+            }
+            const reasonEl = document.getElementById("reason");
+            const roomEl = document.getElementById("room");
+            const reason = reasonEl ? reasonEl.value.trim() : "";
+            // room will only exist after availability
+            if (!roomEl) {
+                errorAlert.classList.remove("d-none");
+                errorAlert.textContent = "Please check availability and select a room before booking.";
+                return;
+            }
+            const room = roomEl.value;
+            // title required
+            if (!reason) {
+                reasonEl && reasonEl.classList.add('is-invalid');
+                errorAlert.classList.remove("d-none");
+                errorAlert.textContent = "Please enter a meeting title.";
+                return;
+            } else {
+                reasonEl && reasonEl.classList.remove('is-invalid');
+            }
+            const bookBtn = document.getElementById("bookMeetingBtn");
+            const bookSpinner = document.getElementById("bookSpinner");
+            const bookText = document.getElementById("bookText");
+            bookBtn.setAttribute("disabled", "disabled");
+            bookSpinner.classList.remove("d-none");
+            bookText.textContent = "Booking...";
+            const attendees = [...document.getElementById("selectedUsers").options].map(opt => opt.value);
+            const startDate = document.getElementById("start-date").value;
+            const endDate = document.getElementById("end-date").value;
+            fetch("api/meeting/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ reason, room, candidates: attendees, startDate, endDate })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.error) {
+                    document.getElementById("error").classList.remove("d-none");
+                    document.getElementById("error").textContent = data.error;
+                    bookBtn.removeAttribute("disabled");
+                    bookSpinner.classList.add("d-none");
+                    bookText.textContent = "Book Meeting";
+                    return;
+                }
+                document.getElementById("error").classList.add("d-none");
+                if(!data.error) {
+                    window.location.href = "/";
+                }
+            })
+            .catch(error => {
+                console.error(error);
+            })
+            .finally(() => {
+                const btn = document.getElementById("bookMeetingBtn");
+                const spinner = document.getElementById("bookSpinner");
+                const text = document.getElementById("bookText");
+                if (btn) btn.removeAttribute("disabled");
+                if (spinner) spinner.classList.add("d-none");
+                if (text) text.textContent = "Book Meeting";
+            });
+        });
+    </script>
+<%- include('partials/footer') %>

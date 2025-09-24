@@ -1,0 +1,101 @@
+<%- include('partials/header') %>
+    <section id="createRoom" class="min-vh-100 bg-light">
+        <div class="container py-5">
+            <div class="row justify-content-center">
+                <div class="col-12 col-lg-8 col-xl-6">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-body p-4 p-md-5">
+                            <div class="mb-3">
+                                <h2 class="h4 mb-1">Create a Room</h2>
+                                <p class="text-muted mb-0">Add a new meeting room with a descriptive name and capacity.</p>
+                            </div>
+                            <form>
+                                <div id="error" class="alert alert-danger d-none" role="alert"></div>
+                                <div class="mb-3">
+                                    <label for="name" class="form-label">Name</label>
+                                    <input type="text" class="form-control" id="name" name="name" placeholder="e.g., Ocean View, Huddle Room A" maxlength="80" required>
+                                    <div class="form-text">Use a clear, recognizable name for the room.</div>
+                                    <div class="invalid-feedback">Please enter a room name.</div>
+                                </div>
+                                <div class="mb-4">
+                                    <label for="capacity" class="form-label">Capacity</label>
+                                    <input type="number" class="form-control" id="capacity" name="capacity" placeholder="e.g., 8" min="1" step="1" inputmode="numeric" required>
+                                    <div class="form-text">How many people can this room accommodate?</div>
+                                    <div class="invalid-feedback">Capacity must be a number greater than 0.</div>
+                                </div>
+                                <button type="submit" class="btn btn-primary" id="createRoom">
+                                    <span id="createSpinner" class="spinner-border spinner-border-sm me-2 align-text-top d-none" role="status" aria-hidden="true"></span>
+                                    <span id="createText">Create Room</span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section> 
+    <script>
+        document.getElementById("createRoom").addEventListener("click", function (e) {
+            e.preventDefault();
+            const nameEl = document.getElementById("name");
+            const capacityEl = document.getElementById("capacity");
+            const errorAlert = document.getElementById("error");
+            const btn = document.getElementById("createRoom");
+            const spinner = document.getElementById("createSpinner");
+            const text = document.getElementById("createText");
+
+            const name = nameEl.value.trim();
+            const capacity = parseInt(capacityEl.value, 10);
+
+            // reset invalid states
+            nameEl.classList.remove('is-invalid');
+            capacityEl.classList.remove('is-invalid');
+            errorAlert.classList.add('d-none');
+
+            // validation
+            let valid = true;
+            if(!name) { nameEl.classList.add('is-invalid'); valid = false; }
+            if(!(Number.isInteger(capacity) && capacity > 0)) { capacityEl.classList.add('is-invalid'); valid = false; }
+            if(!valid) {
+                errorAlert.classList.remove('d-none');
+                errorAlert.textContent = "Please provide a room name and a capacity greater than 0.";
+                return;
+            }
+
+            // set loading state
+            btn.setAttribute('disabled', 'disabled');
+            spinner.classList.remove('d-none');
+            text.textContent = 'Creating...';
+
+            fetch("/api/room/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ name, capacity }),
+            })
+            .then((response) => response.json())
+            .then((data) => {
+                if(data.error) {
+                    errorAlert.classList.remove("d-none");
+                    errorAlert.textContent = data.error;
+                    return;
+                }
+                // success
+                errorAlert.classList.add("d-none");
+                errorAlert.textContent = "";
+                window.location.href = "/";
+            })
+            .catch((error) => {
+                errorAlert.classList.remove("d-none");
+                errorAlert.textContent = error.message;
+            })
+            .finally(() => {
+                // reset loading state (in case of error)
+                btn.removeAttribute('disabled');
+                spinner.classList.add('d-none');
+                text.textContent = 'Create Room';
+            });
+        });
+    </script>
+  <%- include('partials/footer') %>
