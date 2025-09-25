@@ -21,6 +21,7 @@ const createMeeting = async (req, res) => {
         if(isApproved){
             const { subject, html } = buildMeetingEmail(meeting, req.email, meeting.user.email, { appUrl: process.env.DOMAIN, action: 'created' });
             sendToListOfUsers(meeting.candidates, subject, html);
+            createEmailNotification(meeting);
         }
         else{
             let managers = meeting.candidates.filter(c => c.role === "manager");
@@ -82,6 +83,8 @@ const updateMeeting = async (req, res) => {
                 const { subject, html } = buildMeetingEmail(meeting, req.email, meeting.user.email, { appUrl: process.env.DOMAIN, action: 'updated' });
                 sendToListOfUsers(meeting.candidates, subject, html);
             }
+            deleteEmailNotification(oldMeeting);
+            createEmailNotification(meeting);
         }
         return res.status(200).json({ meeting });
     } catch (error) {
@@ -95,6 +98,7 @@ const deleteMeeting = async (req, res) => {
         if(meeting.isApproved){
             const { subject, html } = buildMeetingEmail(meeting, req.email, meeting.user.email, { appUrl: process.env.DOMAIN, action: 'cancelled' });
             sendToListOfUsers(meeting.candidates, subject, html);
+            deleteEmailNotification(meeting);
         }
         return res.status(200).json({ meeting });
     } catch (error) {
@@ -107,6 +111,7 @@ const approveMeeting = async (req, res) => {
         const meeting = await Meeting.findByIdAndUpdate(req.params.id, { isApproved: true }, { new: true }).populate("user").populate("candidates").populate("room");
         const { subject, html } = buildMeetingEmail(meeting, req.email, meeting.user.email, { appUrl: process.env.DOMAIN, action: 'created' });
         sendToListOfUsers(meeting.candidates, subject, html);
+        createEmailNotification(meeting);
         return res.status(200).json({ meeting });
     } catch (error) {
         return res.status(500).json({ error: error.message });

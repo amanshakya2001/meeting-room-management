@@ -38,7 +38,7 @@ function normalizeRecipient(item) {
 
 /**
  * buildMeetingEmail(meeting, actionEmail, organizerEmail, opts)
- * - opts.action: 'created' | 'updated' | 'cancelled' | 'candidates_removed' | 'pending' ...
+ * - opts.action: 'created' | 'updated' | 'cancelled' | 'candidates_removed' | 'pending' | 'reminder'
  * - opts.removedCandidates: array (for candidates_removed)
  * - opts.managers: array of recipients (for pending)
  * - opts.admins: array of recipients (for pending)
@@ -102,6 +102,18 @@ function buildMeetingEmail(meeting = {}, actionEmail = '', organizerEmail = '', 
   let accentColor = '#0b78e3';
   let introLine = `You have a new meeting scheduled by ${actionEmail}.`;
 
+  // --- Extra: compute "starts in X minutes" when start is valid ---
+  let startsInMinutes = null;
+  try {
+    if (!isNaN(start)) {
+      const now = new Date();
+      const diffMs = start - now;
+      startsInMinutes = Math.round(diffMs / 60000); // can be negative if started already
+    }
+  } catch (e) {
+    startsInMinutes = null;
+  }
+
   // Action-specific adjustments
   if (action === 'updated') {
     subjectPrefix = 'Meeting Updated';
@@ -131,13 +143,31 @@ function buildMeetingEmail(meeting = {}, actionEmail = '', organizerEmail = '', 
     headline = 'Meeting Pending Approval';
     accentColor = '#6b7280'; // neutral gray for pending
     introLine = `A new meeting created by ${actionEmail} requires approval. Please review and approve or reject.`;
+  } else if (action === 'reminder') {
+    // Reminder (intended to be sent ~5 minutes before meeting)
+    subjectPrefix = 'Meeting Reminder';
+    headline = 'Upcoming Meeting — Starting Soon';
+    accentColor = '#06b6d4';
+    if (startsInMinutes !== null && Number.isFinite(startsInMinutes) && startsInMinutes >= 0) {
+      // Prefer an accurate minutes-based intro when possible
+      if (startsInMinutes === 0) {
+        introLine = `This is a reminder: the meeting is starting now (${startLabel}).`;
+      } else if (startsInMinutes === 1) {
+        introLine = `This is a reminder: the meeting will start in about 1 minute (${startLabel}).`;
+      } else {
+        introLine = `This is a reminder: the meeting will start in approximately ${startsInMinutes} minutes (${startLabel}).`;
+      }
+    } else {
+      // Fallback copy (suitable for the standard "5 minutes before" scenario)
+      introLine = `This is a reminder that the meeting will start in approximately 5 minutes.`;
+    }
   }
 
   const subject = `${subjectPrefix}: ${roomName} — ${startLabel}`;
 
   const base = (opts.appUrl || process.env.APP_URL || 'https://app.example.com').replace(/\/$/, '');
   const meetingUrl = meeting._id ? `${base}/meetings/${meeting._id}` : base;
-  const ctaText = (action === 'cancelled') ? 'View Details' : (action === 'pending' ? 'Review & Approve' : 'View Meeting');
+  const ctaText = (action === 'cancelled') ? 'View Details' : (action === 'pending' ? 'Review & Approve' : (action === 'reminder' ? 'Join Meeting' : 'View Meeting'));
 
   // Removed candidates blocks (only shown when action === 'candidates_removed' and list present)
   const removedHtmlBlock = (action === 'candidates_removed' && removedListDisplay.length > 0)
@@ -236,7 +266,8 @@ function buildMeetingEmail(meeting = {}, actionEmail = '', organizerEmail = '', 
     updated: 'Updated',
     cancelled: 'Cancelled',
     candidates_removed: 'Attendees Removed',
-    pending: 'Pending Approval'
+    pending: 'Pending Approval',
+    reminder: 'Reminder'
   };
   const plainHeader = `${reason} — ${actionTextMap[action] || 'Scheduled'}`;
 
@@ -255,6 +286,16 @@ function buildMeetingEmail(meeting = {}, actionEmail = '', organizerEmail = '', 
 
   if (removedTextBlock) textParts.push(removedTextBlock);
   if (pendingTextBlock) textParts.push(pendingTextBlock);
+
+  // If reminder, add an explicit reminder line if startsInMinutes available
+  if (action === 'reminder') {
+    if (startsInMinutes !== null && Number.isFinite(startsInMinutes) && startsInMinutes >= 0) {
+      textParts.push(`Reminder: Meeting starts in ~${startsInMinutes} minute(s).`);
+    } else {
+      textParts.push(`Reminder: Meeting will start in approximately 5 minutes.`);
+    }
+    textParts.push('');
+  }
 
   textParts.push(`${ctaText}: ${meetingUrl}`);
   textParts.push('');
