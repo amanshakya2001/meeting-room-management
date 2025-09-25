@@ -12,6 +12,7 @@ const createEmailNotification = (meeting) => {
 };
 
 const deleteEmailNotification = (meeting) => {
+    if (!job[meeting._id]) return;
     job[meeting._id].stop();
     delete job[meeting._id];
 };
