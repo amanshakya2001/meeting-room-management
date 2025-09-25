@@ -10,19 +10,22 @@
                                     <h2 class="h4 mb-1">Update Meeting</h2>
                                     <p class="text-muted mb-0">Edit details, adjust time, change room and attendees.</p>
                                 </div>
+                                <span class="badge text-bg-primary">Edit</span>
                             </div>
 
                             <form>
                                 <div id="error" class="alert alert-danger d-none" role="alert"></div>
                                 <div class="row g-3">
-                                    <div class="col-12 col-md-6">
+                                    <div class="col-12 col-md-6 input-icon">
                                         <label for="start-date" class="form-label">Start</label>
+                                        <i class="bi bi-calendar-event"></i>
                                         <input type="datetime-local" name="start-date" id="start-date" class="form-control" placeholder="Select start date & time" required>
                                         <div id="start-invalid" class="invalid-feedback">Start time cannot be in the past.</div>
                                         <div class="form-text">Choose the meeting start date and time.</div>
                                     </div>
-                                    <div class="col-12 col-md-6">
+                                    <div class="col-12 col-md-6 input-icon">
                                         <label for="end-date" class="form-label">End</label>
+                                        <i class="bi bi-clock-history"></i>
                                         <input type="datetime-local" name="end-date" id="end-date" class="form-control" placeholder="Select end date & time" required>
                                         <div id="end-invalid" class="invalid-feedback">End time must be after the start time.</div>
                                         <div class="form-text">End time must be after the start time.</div>
@@ -32,7 +35,10 @@
                                 <div id="available-rooms" class="mb-4"></div>
                                 <div id="meetingReason" class="mb-3">
                                     <label for="reason" class="form-label">Meeting Title</label>
-                                    <input type="text" name="reason" id="reason" class="form-control" placeholder="e.g., Quarterly Planning, Sync with Design" maxlength="120">
+                                    <div class="input-icon">
+                                        <i class="bi bi-type"></i>
+                                        <input type="text" name="reason" id="reason" class="form-control" placeholder="e.g., Quarterly Planning, Sync with Design" maxlength="120">
+                                    </div>
                                     <div class="form-text">Provide a short and descriptive title for your meeting.</div>
                                 </div>
                                 <div id="attendees" class="row gy-3 mb-4">
@@ -45,8 +51,8 @@
                                       <select id="availableUsers" multiple class="form-select" size="10"></select>
                                     </div>
                                     <div class="col-12 col-md-2 d-flex flex-row flex-md-column justify-content-center align-items-center gap-2">
-                                      <button type="button" id="addUser" class="btn btn-sm btn-primary w-100">&gt;&gt;</button>
-                                      <button type="button" id="removeUser" class="btn btn-sm btn-outline-danger w-100">&lt;&lt;</button>
+                                      <button type="button" id="addUser" class="btn btn-sm btn-primary w-100" title="Add to selected"><i class="bi bi-chevron-double-right"></i></button>
+                                      <button type="button" id="removeUser" class="btn btn-sm btn-outline-danger w-100" title="Remove from selected"><i class="bi bi-chevron-double-left"></i></button>
                                     </div>
                                     <div class="col-12 col-md-5">
                                       <h6 class="mb-2">Selected Users</h6>
@@ -238,6 +244,11 @@
             const labelElement = document.createElement("label");
             labelElement.className = "form-label";
             labelElement.innerHTML = "Room";
+            // Wrap select with icon for consistent UI
+            const wrap = document.createElement('div');
+            wrap.className = 'input-icon';
+            const icon = document.createElement('i');
+            icon.className = 'bi bi-door-closed';
             const selectElement = document.createElement("select");
             selectElement.id = "room";
             selectElement.name = "room";
@@ -255,7 +266,9 @@
                 selectElement.appendChild(opt);
             });
             availableRoomsDiv.appendChild(labelElement);
-            availableRoomsDiv.appendChild(selectElement);
+            wrap.appendChild(icon);
+            wrap.appendChild(selectElement);
+            availableRoomsDiv.appendChild(wrap);
 
             // hint if we can't populate the select with a valid option later
             const hint = document.createElement('div');

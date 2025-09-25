@@ -11,14 +11,16 @@
                             </div>
                             <form>
                                 <div id="error" class="alert alert-danger d-none" role="alert"></div>
-                                <div class="mb-3">
+                                <div class="mb-3 input-icon">
                                     <label for="name" class="form-label">Name</label>
+                                    <i class="bi bi-door-closed"></i>
                                     <input type="text" class="form-control" id="name" name="name" placeholder="e.g., Ocean View, Huddle Room A" maxlength="80" required>
                                     <div class="form-text">Use a clear, recognizable name for the room.</div>
                                     <div class="invalid-feedback">Please enter a room name.</div>
                                 </div>
-                                <div class="mb-4">
+                                <div class="mb-4 input-icon">
                                     <label for="capacity" class="form-label">Capacity</label>
+                                    <i class="bi bi-people"></i>
                                     <input type="number" class="form-control" id="capacity" name="capacity" placeholder="e.g., 8" min="1" step="1" inputmode="numeric" required>
                                     <div class="form-text">How many people can this room accommodate?</div>
                                     <div class="invalid-feedback">Capacity must be a number greater than 0.</div>

@@ -5,26 +5,31 @@
           <div class="col-12 col-lg-8 col-xl-6">
             <div class="card shadow-sm border-0">
               <div class="card-body p-4 p-md-5">
-                <div class="mb-4">
-                  <h2 class="h4 mb-1">Update Room</h2>
-                  <p class="text-muted mb-0">Modify room name and capacity, then save your changes.</p>
+                <div class="mb-4 d-flex justify-content-between align-items-end">
+                  <div>
+                    <h2 class="h4 mb-1">Update Room</h2>
+                    <p class="text-muted mb-0">Modify room name and capacity, then save your changes.</p>
+                  </div>
+                  <span class="badge text-bg-primary">Room Settings</span>
                 </div>
 
                 <div id="error" class="alert alert-danger d-none" role="alert"></div>
                 <div id="success" class="alert alert-success d-none" role="alert"></div>
 
                 <form class="row g-3" onsubmit="return false;">
-                  <div class="col-12">
+                  <div class="col-12 input-icon">
                     <label class="form-label" for="room-name">Room Name</label>
+                    <i class="bi bi-door-closed"></i>
                     <input type="text" id="room-name" name="name" class="form-control" placeholder="e.g., Ocean View" value="<%= room.name %>" required>
                     <div class="form-text">Provide a clear and unique name for the room.</div>
                   </div>
-                  <div class="col-12">
+                  <div class="col-12 input-icon">
                     <label class="form-label" for="room-capacity">Capacity</label>
+                    <i class="bi bi-people"></i>
                     <input type="number" id="room-capacity" name="capacity" class="form-control" placeholder="e.g., 10" value="<%= room.capacity %>" min="1" required>
                     <div class="form-text">Total number of people the room can accommodate.</div>
                   </div>
-                  <div class="col-12 pt-2">
+                  <div class="col-12 pt-2 d-flex justify-content-end">
                     <button type="button" id="updateRoomBtn" class="btn btn-primary" onclick="updateRoom('<%= room._id %>')">
                       <span id="updateSpinner" class="spinner-border spinner-border-sm me-2 align-text-top d-none" role="status" aria-hidden="true"></span>
                       <span id="updateText">Save Changes</span>
